@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Chat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        #messages { height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+        .message { margin-bottom: 5px; }
+        .username { font-weight: bold; }
+        #typing { height: 20px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Real-time Chat</h1>
+    <div id="messages"></div>
+    <div id="typing"></div>
+    <input type="text" id="message-input" placeholder="Type your message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <script>
+        const socket = io();
+        const messagesDiv = document.getElementById('messages');
+        const typingDiv = document.getElementById('typing');
+        const messageInput = document.getElementById('message-input');
+        let typingTimeout;
+        const username = "{{ username }}";
+        let typingUsers = new Set();
+
+        socket.on('message', function(data) {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            messageElement.innerHTML = `<span class="username">${data.username}:</span> ${data.message}`;
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        socket.on('typing', function(data) {
+            if (data.typing) {
+                typingUsers.add(data.username);
+            } else {
+                typingUsers.delete(data.username);
+            }
+            updateTypingStatus();
+        });
+
+        function updateTypingStatus() {
+            const typingList = Array.from(typingUsers);
+            if (typingList.length === 0) {
+                typingDiv.textContent = '';
+            } else if (typingList.length === 1) {
+                typingDiv.textContent = `${typingList[0]} is typing...`;
+            } else {
+                const lastUser = typingList.pop();
+                typingDiv.textContent = `${typingList.join(', ')} and ${lastUser} are typing...`;
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value;
+            if (message) {
+                socket.emit('message', { username: username, message: message });
+                messageInput.value = '';
+            }
+        }
+
+        messageInput.addEventListener('input', function() {
+            socket.emit('typing', { username: username, typing: true });
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('typing', { username: username, typing: false });
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
